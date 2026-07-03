@@ -1,20 +1,25 @@
 # CorvinLogs — Transparent Healing Trace Telemetry
 
-This repository is the public transparency mirror for CorvinOS healing trace telemetry,
-as specified in [ADR-0180](https://github.com/CorvinLabs/Corvin-ADR/blob/main/decisions/0180-cross-instance-healing-trace-aggregation.md).
+This repository is the public transparency mirror for CorvinOS healing trace
+telemetry. When CorvinOS fixes a runtime error automatically (self-healing),
+it can optionally record a **HealingTrace** — a scrubbed, PII-free description
+of what broke and what was done to fix it. These records are published here so
+the community can verify exactly what data is collected.
 
-## What is this?
+## What is a HealingTrace?
 
-When a CorvinOS instance self-heals (fixes a runtime error autonomously), it can
-optionally record a **HealingTrace** — a scrubbed, PII-free description of what broke
-and what was done to fix it. These traces are collected here so that:
+A HealingTrace is a tiny structured record that describes one self-healing
+event. Every field is validated by an allowlist before anything is written to
+disk. Unknown or unexpected fields cause the entire record to be dropped —
+never silently stored.
 
-1. The maintainer can identify which bugs affect multiple users and prioritise fixes.
-2. The community can verify exactly what data is collected (transparency).
+**Opt-in only.** No data is sent unless you explicitly run:
 
-**Every file in this repository has already been reviewed by the maintainer before
-being published here.** Raw uploads go to a private staging area first; only
-pseudonymised, verified bundles are committed here.
+```bash
+corvin-maintainer healing-traces opt-in
+```
+
+You will be shown the full consent text before being asked to confirm.
 
 ## What data is in these traces?
 
@@ -33,7 +38,7 @@ Each trace contains **only**:
 | Heal outcome | `success` | |
 | Config key hash | `sha256(sorted config key names)` | Key NAMES only, never values |
 | Day | `2026-07-03` | Day only, no time |
-| Instance token | `HMAC-SHA256(server_secret, instance_id)` | Not reversible |
+| Instance token | `HMAC-SHA256(server_secret, instance_id)` | Not reversible — pseudonym only |
 
 ## What is NOT in these traces?
 
@@ -46,16 +51,19 @@ Each trace contains **only**:
 
 ## How to verify this
 
-The schema is fully specified in [ADR-0180 §1](https://github.com/CorvinLabs/Corvin-ADR/blob/main/decisions/0180-cross-instance-healing-trace-aggregation.md#1-healingtrace--schema-allow-list-enforced-pii-free-by-construction).
+The schema is in [`schema/htrace-1.0.json`](schema/htrace-1.0.json) in this
+repository — a JSON Schema with `additionalProperties: false`. Any field not
+in that schema causes the record to be rejected.
 
-The `_assert_safe_htrace()` function in
+The enforcement code is in CorvinOS:
 [`core/console/corvin_console/aco/htrace.py`](https://github.com/CorvinLabs/CorvinOS/blob/main/core/console/corvin_console/aco/htrace.py)
-enforces this schema before any record is written.
+— the `_assert_safe_htrace()` function validates every record before it is
+written to disk. The PII scanner runs before allowlist check; any trace
+containing personal-data patterns is silently dropped.
 
-To inspect a bundle locally:
+To inspect a bundle yourself:
 
 ```bash
-# Download and decompress
 curl -L <bundle_url> | gunzip | python3 -c "
 import sys, json
 for line in sys.stdin:
@@ -71,10 +79,27 @@ for line in sys.stdin:
 traces/
   htrace-v1/
     YYYY-MM-DD/
-      <instance_token_prefix>_YYYY-MM-DD.jsonl.gz   ← daily bundle per instance
+      <token_prefix>_YYYY-MM-DD.jsonl.gz   ← daily bundle per instance
 schema/
-  htrace-1.0.json     ← JSON Schema for validation
+  htrace-1.0.json     ← JSON Schema (single source of truth)
 PRIVACY.md            ← detailed privacy policy
+```
+
+**Every bundle in this repository has been reviewed by the maintainer before
+publication.** Raw uploads go to a private staging area first; only
+pseudonymised, verified bundles are committed here.
+
+## Managing your data
+
+```bash
+# Check current status
+corvin-maintainer healing-traces status
+
+# Stop sending and delete all local traces
+corvin-maintainer healing-traces opt-out
+
+# Request deletion of all uploaded traces (GDPR Art. 17)
+corvin-maintainer healing-traces erase --confirm
 ```
 
 ## Privacy & GDPR
@@ -82,12 +107,9 @@ PRIVACY.md            ← detailed privacy policy
 - **Legal basis:** Art. 6(1)(a) GDPR — explicit consent
 - **Data controller:** Corvin Labs UG (haftungsbeschränkt), Berlin, Germany
 - **Retention:** 90 days from upload, then auto-deleted
-- **Opt-out:** `corvin-maintainer healing-traces opt-out` — immediate effect
-- **Erasure (Art. 17):** `corvin-maintainer healing-traces erase --confirm`
 - **Privacy policy:** https://corvin-labs.com/privacy
 
 ## Related
 
-- [ADR-0180](https://github.com/CorvinLabs/Corvin-ADR/blob/main/decisions/0180-cross-instance-healing-trace-aggregation.md) — design document
-- [ADR-0179](https://github.com/CorvinLabs/Corvin-ADR/blob/main/decisions/0179-telemetry-driven-proven-repair.md) — upstream telemetry layer
 - [CorvinOS](https://github.com/CorvinLabs/CorvinOS) — main repository
+- [CorvinOS source: htrace.py](https://github.com/CorvinLabs/CorvinOS/blob/main/core/console/corvin_console/aco/htrace.py) — enforcement code

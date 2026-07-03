@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/CorvinLabs/CorvinLogs/schema/htrace-1.0.json",
   "title": "HealingTrace v1",
-  "description": "ADR-0180 cross-instance healing trace record — scrubbed, PII-free.",
+  "description": "CorvinOS HealingTrace v1 — scrubbed, PII-free self-healing telemetry record.",
   "type": "object",
   "additionalProperties": false,
   "required": [
