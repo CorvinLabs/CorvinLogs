@@ -13,13 +13,17 @@ event. Every field is validated by an allowlist before anything is written to
 disk. Unknown or unexpected fields cause the entire record to be dropped —
 never silently stored.
 
-**Opt-in only.** No data is sent unless you explicitly run:
+**Default-ON with a one-command opt-out** (ADR-0180, maintainer decision;
+legal basis GDPR Art. 6(1)(f) legitimate interest — every transmitted field is
+content-free and validated fail-closed, see below). Disable at any time with:
 
 ```bash
-corvin-maintainer healing-traces opt-in
+corvin-maintainer healing-traces opt-out
 ```
 
-You will be shown the full consent text before being asked to confirm.
+or set `spec.telemetry.healing_traces: false` in
+`<corvin_home>/tenants/_default/global/tenant.corvin.yaml`. Opting out stops
+collection immediately and deletes all locally stored traces.
 
 ## What data is in these traces?
 
@@ -30,9 +34,8 @@ Each trace contains **only**:
 | CorvinOS version | `0.9.60` | |
 | Platform | `linux/x86_64` | OS family + CPU arch, nothing else |
 | Python version | `3.12` | Major.minor only |
-| Error type | `AttributeError` | Exception class name |
-| Error location | `chat_runtime / stream_turn` | Module + function, from CorvinOS core only |
-| Error template | `object '{}' has no attribute '{}'` | Structure without values |
+| Error type | `AttributeError` | Exception class name; empty for proactive heals (e.g. a stale-lock sweep has no exception) |
+| Error location | `chat_runtime / stream_turn` | Module + function, from CorvinOS core only; empty for proactive heals |
 | Last N event names | `["os_turn.started", "heal.triggered"]` | Audit event *names* only, from a fixed allowlist |
 | Heal action | `restart_service` | What was tried |
 | Heal outcome | `success` | |
@@ -82,7 +85,6 @@ traces/
       <token_prefix>_YYYY-MM-DD.jsonl.gz   ← daily bundle per instance
 schema/
   htrace-1.0.json     ← JSON Schema (single source of truth)
-PRIVACY.md            ← detailed privacy policy
 ```
 
 **Every bundle in this repository has been reviewed by the maintainer before
@@ -104,7 +106,10 @@ corvin-maintainer healing-traces erase --confirm
 
 ## Privacy & GDPR
 
-- **Legal basis:** Art. 6(1)(a) GDPR — explicit consent
+- **Legal basis:** Art. 6(1)(f) GDPR — legitimate interest (content-free,
+  pseudonymous diagnostics; default-ON with immediate opt-out, see above).
+  Where a user has additionally run `healing-traces opt-in`, that ConsentAct
+  is kept as an audit artefact (`consent_act_id`).
 - **Data controller:** Corvin Labs UG (haftungsbeschränkt), Berlin, Germany
 - **Retention:** 90 days from upload, then auto-deleted
 - **Privacy policy:** https://corvin-labs.com/privacy
